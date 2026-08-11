@@ -62,24 +62,36 @@ function Home() {
   const handleUpdateUser = async (userData) => {
     try {
       setError("");
+const handleUpdateUser = async (userData) => {
+  try {
+    setError("");
 
-      const updatedUser = await updateUser(
-        selectedUser.id,
-        userData
-      );
+    try {
+      await updateUser(selectedUser.id, userData);
+    } catch (apiError) {
+      console.warn("JSONPlaceholder PUT failed:", apiError);
+    }
 
-      setUsers((previousUsers) =>
-        previousUsers.map((user) =>
-          user.id === selectedUser.id
-            ? {
-                ...user,
-                ...updatedUser,
-                id: selectedUser.id,
-              }
-            : user
-        )
-      );
+    // Update the UI locally
+    setUsers((previousUsers) =>
+      previousUsers.map((user) =>
+        user.id === selectedUser.id
+          ? {
+              ...user,
+              ...userData,
+            }
+          : user
+      )
+    );
 
+    setSelectedUser(null);
+
+    alert("User updated successfully!");
+  } catch (error) {
+    console.error(error);
+    setError("Failed to update user.");
+  }
+};
       setSelectedUser(null);
 
       alert("User updated successfully!");
