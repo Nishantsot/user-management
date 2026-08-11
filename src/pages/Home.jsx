@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import UserForm from "../components/UserForm";
 import UserTable from "../components/UserTable";
 import Loading from "../components/Loading";
+
 import {
   getUsers,
   createUser,
@@ -16,6 +17,9 @@ function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  // =========================
+  // FETCH USERS
+  // =========================
   useEffect(() => {
     fetchUsers();
   }, []);
@@ -25,32 +29,82 @@ function Home() {
       setLoading(true);
       setError("");
 
-      const data = await getUsers();
+      // First check localStorage
+      const savedUsers = localStorage.getItem("users");
 
-      setUsers(data);
+      if (savedUsers) {
+        setUsers(JSON.parse(savedUsers));
+      } else {
+        // If no saved users, fetch from API
+        const data = await getUsers();
+
+        setUsers(data);
+
+        // Save initial users
+        localStorage.setItem(
+          "users",
+          JSON.stringify(data)
+        );
+      }
     } catch (err) {
       console.error(err);
-      setError("Failed to fetch users. Please try again.");
+      setError(
+        "Failed to fetch users. Please try again."
+      );
     } finally {
       setLoading(false);
     }
   };
 
-  // CREATE
+  // =========================
+  // CREATE USER
+  // =========================
   const handleCreateUser = async (userData) => {
     try {
       setError("");
 
-      const newUser = await createUser(userData);
+      // JSONPlaceholder POST is only simulated
+      try {
+        await createUser(userData);
+      } catch (apiError) {
+        console.warn(
+          "JSONPlaceholder POST failed. Saving locally.",
+          apiError
+        );
+      }
 
-     
-      setUsers((previousUsers) => [
-        ...previousUsers,
-        {
-          ...newUser,
-          id: newUser.id || Date.now(),
-        },
-      ]);
+      setUsers((previousUsers) => {
+        // Get all existing IDs
+        const ids = previousUsers
+          .map((user) => Number(user.id))
+          .filter((id) => Number.isFinite(id));
+
+        // Generate next ID
+        const nextId =
+          ids.length > 0
+            ? Math.max(...ids) + 1
+            : 1;
+
+        // Create user using form data
+        const newUser = {
+          id: nextId,
+          ...userData,
+        };
+
+        // Add new user
+        const updatedUsers = [
+          ...previousUsers,
+          newUser,
+        ];
+
+        // Save to localStorage
+        localStorage.setItem(
+          "users",
+          JSON.stringify(updatedUsers)
+        );
+
+        return updatedUsers;
+      });
 
       alert("User created successfully!");
     } catch (err) {
@@ -59,39 +113,47 @@ function Home() {
     }
   };
 
+  // =========================
+  // UPDATE USER
+  // =========================
   const handleUpdateUser = async (userData) => {
     try {
       setError("");
-const handleUpdateUser = async (userData) => {
-  try {
-    setError("");
 
-    try {
-      await updateUser(selectedUser.id, userData);
-    } catch (apiError) {
-      console.warn("JSONPlaceholder PUT failed:", apiError);
-    }
+      // Try API update
+      try {
+        await updateUser(
+          selectedUser.id,
+          userData
+        );
+      } catch (apiError) {
+        console.warn(
+          "JSONPlaceholder PUT failed. Updating locally.",
+          apiError
+        );
+      }
 
-    // Update the UI locally
-    setUsers((previousUsers) =>
-      previousUsers.map((user) =>
-        user.id === selectedUser.id
-          ? {
-              ...user,
-              ...userData,
-            }
-          : user
-      )
-    );
+      setUsers((previousUsers) => {
+        const updatedUsers = previousUsers.map(
+          (user) =>
+            user.id === selectedUser.id
+              ? {
+                  ...user,
+                  ...userData,
+                  id: selectedUser.id,
+                }
+              : user
+        );
 
-    setSelectedUser(null);
+        // Save updated users
+        localStorage.setItem(
+          "users",
+          JSON.stringify(updatedUsers)
+        );
 
-    alert("User updated successfully!");
-  } catch (error) {
-    console.error(error);
-    setError("Failed to update user.");
-  }
-};
+        return updatedUsers;
+      });
+
       setSelectedUser(null);
 
       alert("User updated successfully!");
@@ -101,6 +163,9 @@ const handleUpdateUser = async (userData) => {
     }
   };
 
+  // =========================
+  // DELETE USER
+  // =========================
   const handleDeleteUser = async (id) => {
     const confirmed = window.confirm(
       "Are you sure you want to delete this user?"
@@ -113,11 +178,29 @@ const handleUpdateUser = async (userData) => {
     try {
       setError("");
 
-      await deleteUser(id);
+      // Try API delete
+      try {
+        await deleteUser(id);
+      } catch (apiError) {
+        console.warn(
+          "JSONPlaceholder DELETE failed. Deleting locally.",
+          apiError
+        );
+      }
 
-      setUsers((previousUsers) =>
-        previousUsers.filter((user) => user.id !== id)
-      );
+      setUsers((previousUsers) => {
+        const updatedUsers = previousUsers.filter(
+          (user) => user.id !== id
+        );
+
+        // Save updated users
+        localStorage.setItem(
+          "users",
+          JSON.stringify(updatedUsers)
+        );
+
+        return updatedUsers;
+      });
 
       alert("User deleted successfully!");
     } catch (err) {
@@ -126,6 +209,9 @@ const handleUpdateUser = async (userData) => {
     }
   };
 
+  // =========================
+  // FORM SUBMIT
+  // =========================
   const handleFormSubmit = (userData) => {
     if (selectedUser) {
       handleUpdateUser(userData);
@@ -134,40 +220,55 @@ const handleUpdateUser = async (userData) => {
     }
   };
 
+  // =========================
+  // UI
+  // =========================
   return (
     <div className="container py-4">
+
+      {/* HEADER */}
       <div className="text-center mb-4">
-        <h1 className="fw-bold">User Management</h1>
+        <h1 className="fw-bold">
+          User Management
+        </h1>
 
         <p className="text-muted">
           React CRUD application using JSONPlaceholder API
         </p>
       </div>
 
+      {/* ERROR MESSAGE */}
       {error && (
-        <div className="alert alert-danger" role="alert">
+        <div
+          className="alert alert-danger"
+          role="alert"
+        >
           {error}
         </div>
       )}
 
+      {/* USER FORM */}
       <UserForm
         selectedUser={selectedUser}
         onSubmit={handleFormSubmit}
         onCancel={() => setSelectedUser(null)}
       />
 
+      {/* USERS */}
       {loading ? (
         <Loading />
       ) : (
         <>
+          {/* USER COUNT */}
           <div className="d-flex justify-content-between align-items-center mb-3">
             <h3>Users</h3>
 
             <span className="badge bg-primary">
-              Total: {users.length}
+              Total Users: {users.length}
             </span>
           </div>
 
+          {/* USER TABLE */}
           <UserTable
             users={users}
             onEdit={setSelectedUser}
